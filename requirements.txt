@@ -1,0 +1,9 @@
+boto3
+psycopg2-binary
+flask
+pdfminer.six
+gremlinpython
+python-dotenv
+numpy
+pypdf
+botocore
