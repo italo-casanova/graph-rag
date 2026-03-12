@@ -2,27 +2,61 @@ import boto3
 import json
 from logger import get_logger
 
-from config import AWS_REGION, EMBED_MODEL
+from config import EMBED_MODEL
 
-bedrock = boto3.client("bedrock-runtime", region_name=AWS_REGION)
+import requests
+
+from config import OLLAMA_URL, EMBED_MODEL
+
+# bedrock = boto3.client("bedrock-runtime", region_name=AWS_REGION)
 
 logger = get_logger("embedder")
 
-bedrock = boto3.client("bedrock-runtime", region_name=AWS_REGION)
+# bedrock = boto3.client("bedrock-runtime", region_name=AWS_REGION)
 
+
+# def embed(text):
+
+#     logger.info("Calling Bedrock embedding model")
+
+#     body = json.dumps({"inputText": text})
+
+#     response = bedrock.invoke_model(modelId=EMBED_MODEL, body=body)
+
+#     data = json.loads(response["body"].read())
+
+#     vec = data["embedding"]
+
+#     logger.info(f"Embedding received (size={len(vec)})")
+
+#     return vec
+
+
+
+OLLAMA_URL = "http://localhost:11434/api/embeddings"
+MODEL = "nomic-embed-text"
 
 def embed(text):
 
-    logger.info("Calling Bedrock embedding model")
+    logger.info("Calling Ollama embedding model")
 
-    body = json.dumps({"inputText": text})
+    payload = {
+        "model": MODEL,
+        "prompt": text
+    }
 
-    response = bedrock.invoke_model(modelId=EMBED_MODEL, body=body)
+    response = requests.post(OLLAMA_URL, json=payload)
 
-    data = json.loads(response["body"].read())
+    if response.status_code != 200:
+        raise Exception(f"Ollama error: {response.text}")
 
-    vec = data["embedding"]
+    data = response.json()
 
-    logger.info(f"Embedding received (size={len(vec)})")
+    if "embedding" not in data:
+        raise Exception(f"Invalid embedding response: {data}")
 
-    return vec
+    embedding = data["embedding"]
+
+    logger.info(f"Embedding received (size={len(embedding)})")
+
+    return embedding

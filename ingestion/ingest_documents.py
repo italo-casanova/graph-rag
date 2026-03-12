@@ -1,65 +1,138 @@
+import os
+import uuid
+import logging
+import re
+
 from ingestion.pdf_parser import parse_pdf
 from ingestion.chunker import chunk_text
 from ingestion.embedder import embed
 
 from db.postgres import get_connection, release_connection
-from graph.graph_operations import create_concept, insert_document_graph
-
-from logger import get_logger
-
-logger = get_logger("ingestion")
+from graph.graph_operations import insert_document_graph
 
 
-def ingest(pdf_path, doc_id, concept):
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("ingestion")
 
-    logger.info(f"Starting ingestion for {pdf_path}")
 
-    text = parse_pdf(pdf_path)
+DATA_DIR = "data"
 
-    logger.info("PDF parsed")
+
+def clean_text(text):
+    """
+    Remove problematic characters extracted from PDFs
+    """
+
+    if text is None:
+        return ""
+
+    # remove null bytes
+    text = text.replace("\x00", "")
+
+    # remove other control characters
+    text = re.sub(r"[\x00-\x1f]+", " ", text)
+
+    return text.strip()
+
+
+def infer_concept(file_path):
+    """
+    Automatically infer graph concept from directory
+    """
+
+    if "contracts" in file_path.lower():
+        return "Contract"
+
+    if "regulatory" in file_path.lower():
+        return "Regulation"
+
+    if "invoices" in file_path.lower():
+        return "Invoice"
+
+    if "proposals" in file_path.lower():
+        return "Proposal"
+
+    return "Document"
+
+
+def ingest_pdf(file_path):
+
+    doc_id = str(uuid.uuid4())
+
+    concept = infer_concept(file_path)
+
+    logger.info(f"Ingesting {file_path} as concept {concept}")
+
+    text = parse_pdf(file_path)
+
+    text = clean_text(text)
 
     chunks = chunk_text(text)
 
-    logger.info(f"Generated {len(chunks)} chunks")
-
-    create_concept(concept)
-
-    logger.info(f"Concept '{concept}' ensured in graph")
+    logger.info(f"Total chunks: {len(chunks)}")
 
     conn = get_connection()
     cur = conn.cursor()
 
+    # insert graph metadata only once
+    insert_document_graph(doc_id, concept)
+
     for i, chunk in enumerate(chunks):
+
+        chunk = clean_text(chunk)
+
+        if not chunk.strip():
+            continue
 
         logger.info(f"Embedding chunk {i+1}/{len(chunks)}")
 
         embedding = embed(chunk)
 
+        vector = "[" + ",".join(map(str, embedding)) + "]"
+
         cur.execute(
             """
-            INSERT INTO documents(text, embedding)
-            VALUES(%s,%s)
+            INSERT INTO documents (doc_id, text, embedding)
+            VALUES (%s, %s, %s::vector)
             """,
-            (chunk, embedding),
+            (doc_id, chunk, vector),
         )
-
-        logger.info(f"Stored vector for chunk {i+1}")
-
-        insert_document_graph(doc_id, concept, chunk)
-
-        logger.info(f"Inserted graph node for chunk {i+1}")
 
     conn.commit()
 
-    logger.info("Postgres commit completed")
-
     release_connection(conn)
 
-    logger.info(f"Ingestion completed for {pdf_path}")
+    logger.info(f"Ingestion finished for {file_path}")
+
+
+def ingest_all():
+
+    logger.info(f"Scanning directory {DATA_DIR}")
+
+    found_files = 0
+
+    for root, _, files in os.walk(DATA_DIR):
+
+        logger.info(f"Entering directory: {root}")
+
+        for file in files:
+
+            logger.info(f"Found file: {file}")
+
+            if not file.lower().endswith(".pdf"):
+                logger.info(f"Skipping non-pdf file: {file}")
+                continue
+
+            found_files += 1
+
+            path = os.path.join(root, file)
+
+            ingest_pdf(path)
+
+    if found_files == 0:
+        logger.warning("No PDF files found in data directory")
 
 
 if __name__ == "__main__":
 
-    ingest("data/raee.pdf", "doc_raee", "RAEE")
-
-    ingest("data/arrendamiento.pdf", "doc_arrendamiento", "Arrendamiento")
+    ingest_all()

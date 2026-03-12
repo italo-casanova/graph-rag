@@ -1,7 +1,10 @@
 from graph.graph_client import submit_query
 
 
-def create_concept(concept):
+def insert_document_graph(doc_id, concept):
+    """
+    Insert document and concept and connect them safely
+    """
 
     concept = concept.replace("'", " ")
 
@@ -11,63 +14,34 @@ def create_concept(concept):
       .coalesce(
           unfold(),
           addV('Concept').property('name','{concept}')
+      ).as('c')
+      .V().has('Document','doc_id','{doc_id}')
+      .fold()
+      .coalesce(
+          unfold(),
+          addV('Document').property('doc_id','{doc_id}')
+      ).as('d')
+      .coalesce(
+          __.select('c').outE('mentions').where(inV().as('d')),
+          __.select('c').addE('mentions').to('d')
       )
     """
 
     submit_query(query)
 
 
-def insert_document_graph(doc_id, concept, text):
-
-    text = text.replace("'", " ")
-
-    query_doc = f"""
-    g.V().has('Document','doc_id','{doc_id}')
-      .fold()
-      .coalesce(
-        unfold(),
-        addV('Document').property('doc_id','{doc_id}')
-      )
-    """
-
-    submit_query(query_doc)
-
-    query_concept = f"""
-    g.V().has('Concept','name','{concept}')
-      .fold()
-      .coalesce(
-        unfold(),
-        addV('Concept').property('name','{concept}')
-      )
-    """
-
-    submit_query(query_concept)
-
-    query_chunk = f"""
-    g.addV('Chunk')
-      .property('text','{text}')
-    """
-
-    submit_query(query_chunk)
-
-    # SAFE edge creation
-    query_edge = f"""
-    g.V().has('Document','doc_id','{doc_id}').limit(1).as('d')
-     .V().has('Concept','name','{concept}').limit(1)
-     .addE('mentions').from('d')
-    """
-
-    submit_query(query_edge)
-
-
 def get_documents_by_concept(concept, limit=5):
+    """
+    Retrieve documents linked to a concept
+    """
 
     concept = concept.replace("'", " ")
 
     query = f"""
     g.V().has('Concept','name','{concept}')
-      .in('mentions')
-      .values('text')
+      .out('mentions')
+      .values('doc_id')
+      .dedup()
       .limit({limit})
     """
 
@@ -75,5 +49,8 @@ def get_documents_by_concept(concept, limit=5):
 
 
 def count_vertices():
+    """
+    Debug helper
+    """
 
     return submit_query("g.V().count()")

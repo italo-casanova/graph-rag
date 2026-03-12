@@ -9,7 +9,12 @@ app = Flask(__name__)
 @app.route("/query", methods=["POST"])
 def query():
 
-    question = request.json["question"]
+    data = request.get_json(force=True, silent=True)
+
+    if not data or "question" not in data:
+        return jsonify({"error": "missing question"}), 400
+
+    question = data["question"]
 
     context = hybrid_search(question)
 
