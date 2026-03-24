@@ -1,11 +1,9 @@
-import requests
 import json
 import logging
 
-logger = logging.getLogger("entities")
+from llm.bedrock_client import generate_answer
 
-OLLAMA_URL = "http://localhost:11434/api/generate"
-MODEL = "llama3"
+logger = logging.getLogger("entities")
 
 
 def extract_entities(query):
@@ -22,31 +20,28 @@ Query:
 {query}
 """
 
-    payload = {
-        "model": MODEL,
-        "prompt": prompt,
-        "stream": False
-    }
+    try:
 
-    response = requests.post(OLLAMA_URL, json=payload)
+        response = generate_answer([], prompt)
 
-    if response.status_code != 200:
-        logger.error(response.text)
+        text = response.strip()
+
+        # intento directo
+        try:
+            return json.loads(text)
+
+        except Exception:
+
+            # fallback: extraer JSON dentro del texto
+            try:
+                start = text.index("[")
+                end = text.rindex("]") + 1
+                return json.loads(text[start:end])
+            except Exception:
+                logger.warning(f"Could not parse entities: {text}")
+                return []
+
+    except Exception as e:
+        logger.error(f"Entity extraction failed: {e}")
         return []
 
-    data = response.json()
-
-    text = data.get("response", "").strip()
-
-    # try parsing JSON
-    try:
-        return json.loads(text)
-    except Exception:
-
-        # fallback: extract JSON from text
-        try:
-            start = text.index("[")
-            end = text.rindex("]") + 1
-            return json.loads(text[start:end])
-        except Exception:
-            return []
