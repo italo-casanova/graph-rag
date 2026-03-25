@@ -13,12 +13,6 @@ logger = get_logger("app")
 app = Flask(__name__)
 
 
-@app.before_request
-def before_request():
-    request.start_time = time.time()
-    logger.info(f"➡️  {request.method} {request.path}")
-
-
 @app.after_request
 def after_request(response):
     duration = time.time() - getattr(request, "start_time", time.time())

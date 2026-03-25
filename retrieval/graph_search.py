@@ -1,35 +1,38 @@
 from graph.graph_client import submit_query
+import logging
+
+logger = logging.getLogger("graph_search")
 
 
-def search_graph(concepts, limit=10):
-    """
-    Retrieve documents connected to concepts in the graph.
-    Uses multi-hop traversal for better recall.
-    """
+def search_graph(entities, per_entity_limit=5, global_limit=20):
 
-    if not concepts:
+    if not entities:
         return []
 
-    # sanitize
-    concepts = [c.replace("'", "") for c in concepts]
+    doc_ids = set()
 
-    concept_list = ",".join([f'"{c}"' for c in concepts])
+    for entity in entities:
 
-    gremlin = f"""
-    g.V()
-      .hasLabel('Concept')
-      .has('name', within({concept_list}))
-      .as('c')
+        concept_id = f"concept::{entity}"
 
-      .union(
-          __.in('mentions'),          // direct documents
-          __.both().in('mentions')    // related concepts → documents
-      )
+        query = f"""
+        g.V('{concept_id}')
+         .out('mentions')
+         .limit({per_entity_limit})
+         .values('doc_id')
+        """
 
-      .hasLabel('Document')
-      .values('doc_id')
-      .dedup()
-      .limit({limit})
-    """
+        try:
+            results = submit_query(query)
 
-    return submit_query(gremlin)
+            for r in results:
+                doc_ids.add(r)
+
+                if len(doc_ids) >= global_limit:
+                    return list(doc_ids)
+
+        except Exception as e:
+            logger.warning(f"Graph query failed for {entity}: {e}")
+            continue
+
+    return list(doc_ids)
