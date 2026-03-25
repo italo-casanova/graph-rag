@@ -14,9 +14,10 @@ logger = logging.getLogger("neptune")
 
 MAX_RETRIES = 5
 
+_gremlin_client = None
+
 
 def _signed_headers():
-
     session = get_session()
     credentials = session.get_credentials()
 
@@ -30,7 +31,6 @@ def _signed_headers():
 
 
 def _create_client():
-
     endpoint = f"wss://{NEPTUNE_HOST}:{NEPTUNE_PORT}/gremlin"
 
     return client.Client(
@@ -41,19 +41,26 @@ def _create_client():
     )
 
 
+def get_client():
+    global _gremlin_client
+
+    if _gremlin_client is None:
+        _gremlin_client = _create_client()
+
+    return _gremlin_client
+
+
 def submit_query(query):
 
     for attempt in range(MAX_RETRIES):
 
         try:
 
-            logger.info("Executing Gremlin query")
+            logger.info(f"Executing Gremlin query:\n{query}")
 
-            g = _create_client()
+            g = get_client()
 
             result = g.submit(query).all().result()
-
-            g.close()
 
             return result
 
@@ -68,10 +75,8 @@ def submit_query(query):
                 )
 
                 time.sleep(wait)
-
                 continue
 
             raise e
 
     raise Exception("Max retries exceeded for Gremlin query")
-

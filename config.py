@@ -29,4 +29,3 @@ NEPTUNE_PORT = 8182
 # OLLAMA_URL = "http://localhost:11434"
 # LLM_MODEL = "llama3"
 # EMBED_MODEL = "nomic-embed-text"
-

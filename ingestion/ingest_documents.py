@@ -10,7 +10,6 @@ from ingestion.embedder import embed
 from db.postgres import get_connection, release_connection
 from graph.graph_operations import insert_document_graph
 
-
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("ingestion")
 
@@ -57,52 +56,55 @@ def infer_concept(file_path):
 
 def ingest_pdf(file_path):
 
-    doc_id = str(uuid.uuid4())
+    try:
 
-    concept = infer_concept(file_path)
+        doc_id = str(uuid.uuid4())
+        concept = infer_concept(file_path)
 
-    logger.info(f"Ingesting {file_path} as concept {concept}")
+        logger.info(f"Ingesting {file_path} as concept {concept}")
 
-    text = parse_pdf(file_path)
+        text = parse_pdf(file_path)
+        text = clean_text(text)
 
-    text = clean_text(text)
+        chunks = chunk_text(text)
 
-    chunks = chunk_text(text)
+        logger.info(f"Total chunks: {len(chunks)}")
 
-    logger.info(f"Total chunks: {len(chunks)}")
+        conn = get_connection()
+        cur = conn.cursor()
 
-    conn = get_connection()
-    cur = conn.cursor()
+        # 🔥 solo metadata ligera en grafo
+        insert_document_graph(doc_id, concept)
 
-    # insert graph metadata only once
-    insert_document_graph(doc_id, concept)
+        for i, chunk in enumerate(chunks):
 
-    for i, chunk in enumerate(chunks):
+            chunk = clean_text(chunk)
 
-        chunk = clean_text(chunk)
+            if not chunk.strip():
+                continue
 
-        if not chunk.strip():
-            continue
+            logger.info(f"Embedding chunk {i+1}/{len(chunks)}")
 
-        logger.info(f"Embedding chunk {i+1}/{len(chunks)}")
+            embedding = embed(chunk)
 
-        embedding = embed(chunk)
+            vector = "[" + ",".join(map(str, embedding)) + "]"
 
-        vector = "[" + ",".join(map(str, embedding)) + "]"
+            cur.execute(
+                """
+                INSERT INTO documents (doc_id, text, embedding)
+                VALUES (%s, %s, %s::vector)
+                """,
+                (doc_id, chunk, vector),
+            )
 
-        cur.execute(
-            """
-            INSERT INTO documents (doc_id, text, embedding)
-            VALUES (%s, %s, %s::vector)
-            """,
-            (doc_id, chunk, vector),
-        )
+        conn.commit()
+        release_connection(conn)
 
-    conn.commit()
+        logger.info(f"Ingestion finished for {file_path}")
 
-    release_connection(conn)
+    except Exception as e:
 
-    logger.info(f"Ingestion finished for {file_path}")
+        logger.error(f"Error ingesting {file_path}: {e}")
 
 
 def ingest_all():
@@ -136,3 +138,4 @@ def ingest_all():
 if __name__ == "__main__":
 
     ingest_all()
+
