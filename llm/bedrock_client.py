@@ -13,7 +13,9 @@ def generate_answer(context, question):
     prompt = f"""
 Eres un asistente legal.
 
-Usa el contexto proporcionado para responder a la pregunta.
+Usa el contexto proporcionado para responder a la pregunta de manera textual, tal y como esta en el documento,
+No alteres la información y no inventes nada.
+Si no sabes la respuesta, di que no lo sabes.
 
 Contexto:
 {context_text}
