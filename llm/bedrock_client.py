@@ -13,6 +13,12 @@ def generate_answer(context, question):
     prompt = f"""
 Eres un asistente legal.
 
+
+Antes de responder a la pregunta, lee cuidadosamente el contexto proporcionado.
+Asegúrate de entender el contexto antes de formular tu respuesta.
+No trates de responder a la pregunta sin haber leído y comprendido el contexto, ni interpretes
+el contexto de manera diferente a lo que se presenta. No hagas suposiciones ni inventes información adicional.
+
 Usa el contexto proporcionado para responder a la pregunta de manera textual, tal y como esta en el documento,
 No alteres la información y no inventes nada.
 Si no sabes la respuesta, di que no lo sabes.
