@@ -7,21 +7,19 @@ bedrock = boto3.client("bedrock-runtime", region_name=AWS_REGION)
 
 
 def generate_answer(context, question):
-
     context_text = "\n".join(context)
 
     prompt = f"""
 Eres un asistente legal.
 
+Usa el contexto proporcionado para responder la pregunta.
 
-Antes de responder a la pregunta, lee cuidadosamente el contexto proporcionado.
-Asegúrate de entender el contexto antes de formular tu respuesta.
-No trates de responder a la pregunta sin haber leído y comprendido el contexto, ni interpretes
-el contexto de manera diferente a lo que se presenta. No hagas suposiciones ni inventes información adicional.
-
-Usa el contexto proporcionado para responder a la pregunta de manera textual, tal y como esta en el documento,
-No alteres la información y no inventes nada.
-Si no sabes la respuesta, di que no lo sabes.
+Reglas:
+- Responde basándote únicamente en el contexto.
+- Puedes resumir, reorganizar y explicar la información.
+- NO inventes información que no esté en el contexto.
+- Si el contexto no es suficiente, indica claramente qué falta.
+- Incluye fragmentos textuales del contexto como evidencia cuando sea posible.
 
 Contexto:
 {context_text}
