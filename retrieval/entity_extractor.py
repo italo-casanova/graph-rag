@@ -7,21 +7,26 @@ logger = logging.getLogger("entities")
 
 
 def extract_entities(query):
-
     prompt = f"""
-Extract the main legal concepts from the following query.
+Extrae TODAS las entidades relevantes de la consulta.
 
-Return ONLY a JSON array.
+Incluye:
+- conceptos legales (contrato, regulación, factura, etc.)
+- tipos de documentos (adenda, propuesta, cotización, etc.)
+- nombres de empresas
+- productos o tecnologías
+- temas clave (anticorrupción, licencias, etc.)
 
-Example:
-["Contract","Proposal"]
+Devuelve SOLO un arreglo JSON de strings.
 
-Query:
+Ejemplo:
+["Contrato","BanBif","Delphi","Cotización","Anticorrupción"]
+
+Consulta:
 {query}
 """
 
     try:
-
         response = generate_answer([], prompt)
 
         text = response.strip()
@@ -31,7 +36,6 @@ Query:
             return json.loads(text)
 
         except Exception:
-
             # fallback: extraer JSON dentro del texto
             try:
                 start = text.index("[")
@@ -44,4 +48,3 @@ Query:
     except Exception as e:
         logger.error(f"Entity extraction failed: {e}")
         return []
-
