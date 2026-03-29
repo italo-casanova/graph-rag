@@ -5,45 +5,33 @@ from retrieval.entity_extractor import extract_entities
 from retrieval.graph_search import search_graph
 from retrieval.vector_search import search_vector
 
-
 logger = logging.getLogger("hybrid")
 
 
 def hybrid_search(query, k=10):
-    """
-    Hybrid retrieval pipeline:
-
-    1. Extract entities from query
-    2. Retrieve candidate documents from graph
-    3. Rank documents using vector similarity
-    """
 
     logger.info("Starting hybrid search")
 
-    # --- entity extraction ---
+    # --- entities ---
     entities = extract_entities(query)
+    logger.info(f"Entities: {entities}")
 
-    logger.info(f"Extracted entities: {entities}")
-
-    # --- graph retrieval ---
+    # --- graph ---
     doc_ids = search_graph(entities)
+    logger.info(f"Graph docs: {len(doc_ids)}")
 
-    logger.info(f"Graph returned {len(doc_ids)} candidate documents")
-
-    # --- vector embedding ---
+    # --- embedding ---
     embedding = embed(query)
 
-    # --- vector ranking ---
+    # --- ranking ---
     if doc_ids:
-        logger.info("Running filtered vector search")
-
+        logger.info("Using graph-filtered search")
         results = search_vector(embedding, doc_ids, k)
-
     else:
-        logger.info("No graph candidates → fallback to pure vector search")
-
+        logger.warning("⚠️ Graph empty → fallback vector search")
         results = search_vector(embedding, None, k)
 
-    logger.info(f"Retrieved {len(results)} results")
+    logger.info(f"Final results: {len(results)}")
 
     return results
+

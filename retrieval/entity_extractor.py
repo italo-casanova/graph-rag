@@ -1,26 +1,35 @@
 import json
 import logging
+import unicodedata
 
 from llm.bedrock_client import generate_answer
 
 logger = logging.getLogger("entities")
 
 
+def normalize(text):
+    text = text.lower()
+    text = unicodedata.normalize("NFD", text)
+    text = "".join(c for c in text if unicodedata.category(c) != "Mn")
+    return text.strip()
+
+
 def extract_entities(query):
+
     prompt = f"""
-Extrae TODAS las entidades relevantes de la consulta.
+Extrae SOLO entidades útiles para búsqueda en documentos legales.
 
-Incluye:
-- conceptos legales (contrato, regulación, factura, etc.)
-- tipos de documentos (adenda, propuesta, cotización, etc.)
-- nombres de empresas
-- productos o tecnologías
-- temas clave (anticorrupción, licencias, etc.)
+Incluye únicamente:
+- tipos de documentos (contrato, adenda, propuesta, cotización, factura)
+- instituciones o empresas (banbif, r2data)
+- temas clave (anticorrupcion, licencias)
 
-Devuelve SOLO un arreglo JSON de strings.
+NO incluyas palabras irrelevantes.
+
+Devuelve SOLO JSON.
 
 Ejemplo:
-["Contrato","BanBif","Delphi","Cotización","Anticorrupción"]
+["contrato","adenda","banbif","cotizacion"]
 
 Consulta:
 {query}
@@ -28,22 +37,18 @@ Consulta:
 
     try:
         response = generate_answer([], prompt)
-
         text = response.strip()
 
-        # intento directo
         try:
-            return json.loads(text)
+            entities = json.loads(text)
+        except:
+            start = text.find("[")
+            end = text.rfind("]") + 1
+            entities = json.loads(text[start:end])
 
-        except Exception:
-            # fallback: extraer JSON dentro del texto
-            try:
-                start = text.index("[")
-                end = text.rindex("]") + 1
-                return json.loads(text[start:end])
-            except Exception:
-                logger.warning(f"Could not parse entities: {text}")
-                return []
+        entities = [normalize(e) for e in entities]
+
+        return entities
 
     except Exception as e:
         logger.error(f"Entity extraction failed: {e}")

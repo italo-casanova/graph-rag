@@ -3,7 +3,7 @@ import os
 AWS_REGION = "us-east-1"
 
 BEDROCK_MODEL = "us.amazon.nova-pro-v1:0"
-EMBED_MODEL = "amazon.titan-embed-text-v1"
+EMBED_MODEL = "amazon.titan-embed-text-v2:0"
 
 RDS_HOST = os.getenv("RDSHOST", "database-1.cecua5pujewa.us-east-1.rds.amazonaws.com")
 

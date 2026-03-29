@@ -13,22 +13,14 @@ from graph.graph_operations import insert_document_graph
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("ingestion")
 
-
 DATA_DIR = "data"
 
 
 def clean_text(text):
-    """
-    Remove problematic characters extracted from PDFs
-    """
-
-    if text is None:
+    if not text:
         return ""
 
-    # remove null bytes
     text = text.replace("\x00", "")
-
-    # remove other control characters
     text = re.sub(r"[\x00-\x1f]+", " ", text)
 
     return text.strip()
@@ -36,28 +28,29 @@ def clean_text(text):
 
 def infer_concept(file_path):
     """
-    Automatically infer graph concept from directory
+    Normalizado a español (clave para matching con LLM)
     """
 
-    if "contracts" in file_path.lower():
-        return "Contract"
+    path = file_path.lower()
 
-    if "regulatory" in file_path.lower():
-        return "Regulation"
+    if "contracts" in path:
+        return "contrato"
 
-    if "invoices" in file_path.lower():
-        return "Invoice"
+    if "regulatory" in path:
+        return "regulación"
 
-    if "proposals" in file_path.lower():
-        return "Proposal"
+    if "invoices" in path:
+        return "factura"
 
-    return "Document"
+    if "proposals" in path:
+        return "propuesta"
+
+    return "documento"
 
 
 def ingest_pdf(file_path):
 
     try:
-
         doc_id = str(uuid.uuid4())
         concept = infer_concept(file_path)
 
@@ -73,14 +66,14 @@ def ingest_pdf(file_path):
         conn = get_connection()
         cur = conn.cursor()
 
-        # 🔥 solo metadata ligera en grafo
+        # 🔥 grafo con concepto NORMALIZADO
         insert_document_graph(doc_id, concept)
 
         for i, chunk in enumerate(chunks):
 
             chunk = clean_text(chunk)
 
-            if not chunk.strip():
+            if not chunk:
                 continue
 
             logger.info(f"Embedding chunk {i+1}/{len(chunks)}")
@@ -103,39 +96,23 @@ def ingest_pdf(file_path):
         logger.info(f"Ingestion finished for {file_path}")
 
     except Exception as e:
-
-        logger.error(f"Error ingesting {file_path}: {e}")
+        logger.exception(f"Error ingesting {file_path}")
 
 
 def ingest_all():
 
     logger.info(f"Scanning directory {DATA_DIR}")
 
-    found_files = 0
-
     for root, _, files in os.walk(DATA_DIR):
-
-        logger.info(f"Entering directory: {root}")
 
         for file in files:
 
-            logger.info(f"Found file: {file}")
-
             if not file.lower().endswith(".pdf"):
-                logger.info(f"Skipping non-pdf file: {file}")
                 continue
 
-            found_files += 1
-
             path = os.path.join(root, file)
-
             ingest_pdf(path)
-
-    if found_files == 0:
-        logger.warning("No PDF files found in data directory")
 
 
 if __name__ == "__main__":
-
     ingest_all()
-

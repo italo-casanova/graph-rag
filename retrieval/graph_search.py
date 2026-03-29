@@ -4,6 +4,28 @@ import logging
 logger = logging.getLogger("graph_search")
 
 
+ENTITY_TO_CONCEPT = {
+    "contrato": "Contract",
+    "adenda": "Contract",
+    "anticorrupcion": "Contract",
+    "propuesta": "Proposal",
+    "cotizacion": "Proposal",
+    "licencias": "Proposal",
+    "factura": "Invoice",
+    "regulacion": "Regulation",
+    "ley": "Regulation",
+}
+
+
+def map_entity_to_concept(entity):
+
+    for key in ENTITY_TO_CONCEPT:
+        if key in entity:
+            return ENTITY_TO_CONCEPT[key]
+
+    return None
+
+
 def search_graph(entities, per_entity_limit=5, global_limit=20):
 
     if not entities:
@@ -13,7 +35,12 @@ def search_graph(entities, per_entity_limit=5, global_limit=20):
 
     for entity in entities:
 
-        concept_id = f"concept::{entity}"
+        concept = map_entity_to_concept(entity)
+
+        if not concept:
+            continue
+
+        concept_id = f"concept::{concept}"
 
         query = f"""
         g.V('{concept_id}')
@@ -33,6 +60,5 @@ def search_graph(entities, per_entity_limit=5, global_limit=20):
 
         except Exception as e:
             logger.warning(f"Graph query failed for {entity}: {e}")
-            continue
 
     return list(doc_ids)
