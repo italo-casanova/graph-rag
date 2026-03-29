@@ -50,12 +50,23 @@ def get_client():
     return _gremlin_client
 
 
+def _reset_client():
+    global _gremlin_client
+
+    try:
+        if _gremlin_client:
+            _gremlin_client.close()
+    except:
+        pass
+
+    _gremlin_client = None
+
+
 def submit_query(query):
 
     for attempt in range(MAX_RETRIES):
 
         try:
-
             logger.info(f"Executing Gremlin query:\n{query}")
 
             g = get_client()
@@ -66,17 +77,39 @@ def submit_query(query):
 
         except Exception as e:
 
-            if "ConcurrentModificationException" in str(e):
+            error = str(e)
 
+            # 🔁 retry conocidos
+            if any(
+                x in error
+                for x in [
+                    "ConcurrentModificationException",
+                    "ReadOnlyViolationException",
+                    "TimeoutException",
+                ]
+            ):
                 wait = 0.5 * (attempt + 1)
-
-                logger.warning(
-                    f"Concurrent modification detected, retrying in {wait}s..."
-                )
-
+                logger.warning(f"Retryable error, retrying in {wait}s...")
                 time.sleep(wait)
                 continue
 
+            # 🔥 errores de conexión → recrear cliente
+            if any(
+                x in error
+                for x in [
+                    "Connection refused",
+                    "WebSocket",
+                    "closed",
+                    "Failed to write",
+                ]
+            ):
+                logger.warning("Connection issue → resetting client")
+                _reset_client()
+                time.sleep(1)
+                continue
+
+            # ❌ error real → no retry
+            logger.error(f"Gremlin query failed: {error}")
             raise e
 
     raise Exception("Max retries exceeded for Gremlin query")

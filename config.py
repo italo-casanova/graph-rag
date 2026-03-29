@@ -12,7 +12,7 @@ RDS_USER = "postgres"
 RDS_PASSWORD = "mastermaster"
 RDS_PORT = 5432
 
-NEPTUNE_HOST = "db-neptune-1-instance-1.cecua5pujewa.us-east-1.neptune.amazonaws.com"
+NEPTUNE_HOST = "db-neptune-3-instance-1.cecua5pujewa.us-east-1.neptune.amazonaws.com"
 NEPTUNE_PORT = 8182
 
 # # postgres

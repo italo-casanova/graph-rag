@@ -14,19 +14,38 @@ def hybrid_search(query, k=10):
 
     # --- entities ---
     entities = extract_entities(query)
-    logger.info(f"Entities: {entities}")
 
-    # --- graph ---
-    doc_ids = search_graph(entities)
+    concepts = entities.get("concepts", [])
+    keywords = entities.get("keywords", [])
+
+    logger.info(f"Concepts: {concepts}")
+    logger.info(f"Keywords: {keywords}")
+
+    # --- graph search (SOLO concepts) ---
+    doc_ids = search_graph(concepts)
     logger.info(f"Graph docs: {len(doc_ids)}")
 
+    # --- query enhancement ---
+    enhanced_query = query
+    if keywords:
+        enhanced_query = query + " " + " ".join(keywords)
+        logger.info(f"Enhanced query: {enhanced_query}")
+
     # --- embedding ---
-    embedding = embed(query)
+    embedding = embed(enhanced_query)
 
     # --- ranking ---
     if doc_ids:
-        logger.info("Using graph-filtered search")
+        logger.info("Using graph-filtered vector search")
         results = search_vector(embedding, doc_ids, k)
+
+        # 🔥 fallback inteligente si el grafo filtra demasiado
+        if not results:
+            logger.warning(
+                "⚠️ Graph filter too strict → fallback to full vector search"
+            )
+            results = search_vector(embedding, None, k)
+
     else:
         logger.warning("⚠️ Graph empty → fallback vector search")
         results = search_vector(embedding, None, k)
@@ -34,4 +53,3 @@ def hybrid_search(query, k=10):
     logger.info(f"Final results: {len(results)}")
 
     return results
-

@@ -1,4 +1,4 @@
-from graph.graph_client import submit_query
+from graph.graph_client import get_client
 
 
 def _sanitize(text: str) -> str:
@@ -15,46 +15,43 @@ def _document_id(doc_id: str) -> str:
     return f"doc::{doc_id}"
 
 
-def insert_document_graph(doc_id: str, concept: str):
-    """
-    Insert document + concept + edge (safe for Neptune memory)
-    """
+def insert_document_graph(doc_id, concept):
+    concept_id = f"concept::{concept}"
+    doc_vertex_id = f"doc::{doc_id}"
 
-    concept = _sanitize(concept)
+    queries = [
+        f"""
+        g.V('{concept_id}')
+        .fold()
+        .coalesce(
+            unfold(),
+            addV('Concept')
+              .property(id,'{concept_id}')
+              .property('name','{concept}')
+        )
+        """,
+        f"""
+        g.V('{doc_vertex_id}')
+        .fold()
+        .coalesce(
+            unfold(),
+            addV('Document')
+              .property(id,'{doc_vertex_id}')
+              .property('doc_id','{doc_id}')
+        )
+        """,
+        f"""
+        g.V('{concept_id}').as('c')
+        .V('{doc_vertex_id}').as('d')
+        .coalesce(
+            __.select('c').outE('mentions').where(inV().as('d')),
+            __.addE('mentions').from('c').to('d')
+        )
+        """,
+    ]
 
-    concept_id = _concept_id(concept)
-    document_id = _document_id(doc_id)
-
-    # 1. Ensure concept exists
-    submit_query(f"""
-    g.V('{concept_id}')
-      .fold()
-      .coalesce(
-          unfold(),
-          addV('Concept')
-            .property(id,'{concept_id}')
-            .property('name','{concept}')
-      )
-    """)
-
-    # 2. Ensure document exists
-    submit_query(f"""
-    g.V('{document_id}')
-      .fold()
-      .coalesce(
-          unfold(),
-          addV('Document')
-            .property(id,'{document_id}')
-            .property('doc_id','{doc_id}')
-      )
-    """)
-
-    # 3. Create edge (NO heavy check)
-    submit_query(f"""
-    g.V('{concept_id}')
-      .addE('mentions')
-      .to(g.V('{document_id}'))
-    """)
+    for q in queries:
+        submit_query(q)
 
 
 def get_documents_by_concept(concept: str, limit: int = 5):
@@ -127,10 +124,7 @@ def delete_document(doc_id: str):
 
     document_id = _document_id(doc_id)
 
-    query = f"""
-    g.V('{document_id}')
-      .drop()
-    """
+    query = f"g.V('{document_id}').drop()"
 
     return submit_query(query)
 
@@ -139,10 +133,7 @@ def delete_concept(concept: str):
 
     concept_id = _concept_id(concept)
 
-    query = f"""
-    g.V('{concept_id}')
-      .drop()
-    """
+    query = f"g.V('{concept_id}').drop()"
 
     return submit_query(query)
 

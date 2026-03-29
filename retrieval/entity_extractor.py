@@ -6,6 +6,8 @@ from llm.bedrock_client import generate_answer
 
 logger = logging.getLogger("entities")
 
+VALID_CONCEPTS = ["Contract", "Proposal", "Regulation", "Invoice", "Document"]
+
 
 def normalize(text):
     text = text.lower()
@@ -15,24 +17,55 @@ def normalize(text):
 
 
 def extract_entities(query):
+    """
+    Devuelve:
+    {
+        "concepts": ["Contract", "Proposal"],
+        "keywords": ["banbif", "anticorrupcion"]
+    }
+    """
+
+    concepts_list = ", ".join(VALID_CONCEPTS)
 
     prompt = f"""
-Extrae SOLO entidades útiles para búsqueda en documentos legales.
+Eres un sistema de extracción de información legal.
 
-Incluye únicamente:
-- tipos de documentos (contrato, adenda, propuesta, cotización, factura)
-- instituciones o empresas (banbif, r2data)
-- temas clave (anticorrupcion, licencias)
+Tu tarea es analizar la consulta y devolver DOS cosas:
 
-NO incluyas palabras irrelevantes.
+1. "concepts": tipos de documentos del grafo
+2. "keywords": términos importantes para búsqueda semántica
 
-Devuelve SOLO JSON.
+Conceptos válidos (usa SOLO estos):
+{concepts_list}
+
+Reglas:
+- "concepts" SOLO puede contener valores de la lista
+- "keywords" debe incluir empresas, temas, productos
+- Normaliza todo a minúsculas
+- No inventes conceptos fuera de la lista
+
+Devuelve SOLO JSON con esta estructura:
+
+{{
+  "concepts": [...],
+  "keywords": [...]
+}}
 
 Ejemplo:
-["contrato","adenda","banbif","cotizacion"]
+
+Consulta:
+"¿Qué dice la adenda anticorrupción firmada con BanBif?"
+
+Respuesta:
+{{
+  "concepts": ["Contract"],
+  "keywords": ["banbif", "anticorrupcion", "adenda"]
+}}
 
 Consulta:
 {query}
+
+Respuesta:
 """
 
     try:
@@ -40,16 +73,32 @@ Consulta:
         text = response.strip()
 
         try:
-            entities = json.loads(text)
-        except:
-            start = text.find("[")
-            end = text.rfind("]") + 1
-            entities = json.loads(text[start:end])
+            data = json.loads(text)
+        except Exception:
+            start = text.find("{")
+            end = text.rfind("}") + 1
+            data = json.loads(text[start:end])
 
-        entities = [normalize(e) for e in entities]
+        # --- validar concepts ---
+        concepts = [c for c in data.get("concepts", []) if c in VALID_CONCEPTS]
 
-        return entities
+        # fallback inteligente
+        if not concepts:
+            concepts = ["Contract", "Proposal"]
+
+        # --- normalizar keywords ---
+        keywords = [
+            normalize(k)
+            for k in data.get("keywords", [])
+            if isinstance(k, str) and len(k) > 2
+        ]
+
+        logger.info(f"Concepts: {concepts}")
+        logger.info(f"Keywords: {keywords}")
+
+        return {"concepts": concepts, "keywords": keywords}
 
     except Exception as e:
         logger.error(f"Entity extraction failed: {e}")
-        return []
+
+        return {"concepts": ["Contract", "Proposal"], "keywords": []}
