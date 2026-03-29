@@ -5,19 +5,20 @@ logger = logging.getLogger("graph_search")
 
 
 ENTITY_TO_CONCEPT = {
-    "contrato": "Contract",
-    "adenda": "Contract",
-    "anticorrupcion": "Contract",
-    "propuesta": "Proposal",
-    "cotizacion": "Proposal",
-    "licencias": "Proposal",
-    "factura": "Invoice",
-    "regulacion": "Regulation",
-    "ley": "Regulation",
+    "contrato": "contrato",
+    "adenda": "contrato",
+    "anticorrupcion": "contrato",
+    "propuesta": "propuesta",
+    "cotizacion": "propuesta",
+    "licencias": "propuesta",
+    "factura": "factura",
+    "regulacion": "regulacion",
+    "ley": "regulacion",
 }
 
 
 def map_entity_to_concept(entity):
+    entity = entity.lower()
 
     for key in ENTITY_TO_CONCEPT:
         if key in entity:

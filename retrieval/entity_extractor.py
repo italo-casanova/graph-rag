@@ -6,7 +6,17 @@ from llm.bedrock_client import generate_answer
 
 logger = logging.getLogger("entities")
 
+# ⚠️ SOLO para el LLM (entrada)
 VALID_CONCEPTS = ["Contract", "Proposal", "Regulation", "Invoice", "Document"]
+
+# ✅ MAPEA a lo que EXISTE en Neptune
+CONCEPT_MAPPING = {
+    "contract": "contrato",
+    "proposal": "propuesta",
+    "regulation": "regulacion",
+    "invoice": "factura",
+    "document": "documento",
+}
 
 
 def normalize(text):
@@ -17,14 +27,6 @@ def normalize(text):
 
 
 def extract_entities(query):
-    """
-    Devuelve:
-    {
-        "concepts": ["Contract", "Proposal"],
-        "keywords": ["banbif", "anticorrupcion"]
-    }
-    """
-
     concepts_list = ", ".join(VALID_CONCEPTS)
 
     prompt = f"""
@@ -51,17 +53,6 @@ Devuelve SOLO JSON con esta estructura:
   "keywords": [...]
 }}
 
-Ejemplo:
-
-Consulta:
-"¿Qué dice la adenda anticorrupción firmada con BanBif?"
-
-Respuesta:
-{{
-  "concepts": ["Contract"],
-  "keywords": ["banbif", "anticorrupcion", "adenda"]
-}}
-
 Consulta:
 {query}
 
@@ -79,14 +70,25 @@ Respuesta:
             end = text.rfind("}") + 1
             data = json.loads(text[start:end])
 
-        # --- validar concepts ---
-        concepts = [c for c in data.get("concepts", []) if c in VALID_CONCEPTS]
+        # ✅ 1. VALIDAR conceptos del LLM
+        raw_concepts = [
+            c
+            for c in data.get("concepts", [])
+            if isinstance(c, str) and c in VALID_CONCEPTS
+        ]
 
-        # fallback inteligente
+        # ✅ 2. MAPEAR A ESPAÑOL (LO QUE TIENES EN NEPTUNE)
+        concepts = [
+            CONCEPT_MAPPING.get(c.lower())
+            for c in raw_concepts
+            if c.lower() in CONCEPT_MAPPING
+        ]
+
+        # ✅ 3. FALLBACK CORRECTO (EN ESPAÑOL)
         if not concepts:
-            concepts = ["Contract", "Proposal"]
+            concepts = ["contrato", "propuesta"]
 
-        # --- normalizar keywords ---
+        # ✅ 4. NORMALIZAR KEYWORDS
         keywords = [
             normalize(k)
             for k in data.get("keywords", [])
@@ -101,4 +103,5 @@ Respuesta:
     except Exception as e:
         logger.error(f"Entity extraction failed: {e}")
 
-        return {"concepts": ["Contract", "Proposal"], "keywords": []}
+        # ✅ fallback consistente
+        return {"concepts": ["contrato", "propuesta"], "keywords": []}
