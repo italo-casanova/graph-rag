@@ -1,4 +1,4 @@
-from graph.graph_client import get_client
+from graph.graph_client import submit_query
 
 
 def _sanitize(text: str) -> str:
