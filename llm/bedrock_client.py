@@ -11,17 +11,17 @@ def generate_answer(context, question):
     context_text = "\n".join(context)
 
     prompt = f"""
-You are a legal assistant.
+Eres un asistente legal.
 
-Use the context to answer the question.
+Usa el contexto proporcionado para responder a la pregunta.
 
-Context:
+Contexto:
 {context_text}
 
-Question:
+Pregunta:
 {question}
 
-Answer:
+Respuesta:
 """
 
     body = json.dumps(
@@ -37,4 +37,3 @@ Answer:
     data = json.loads(response["body"].read())
 
     return data["output"]["message"]["content"][0]["text"]
-
